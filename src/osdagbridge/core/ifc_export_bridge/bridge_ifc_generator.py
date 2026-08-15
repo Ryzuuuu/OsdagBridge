@@ -60,14 +60,18 @@ class BridgeIfcGenerator:
         self.site = self.file.createIfcSite(create_ifc_guid(), self._owner_history, Name="Default Site", ObjectPlacement=self.file.createIfcLocalPlacement(None, place_3d))
         self.building = self.file.createIfcBuilding(create_ifc_guid(), self._owner_history, Name="Bridge Structure", ObjectPlacement=self.file.createIfcLocalPlacement(self.site.ObjectPlacement, place_3d))
         self.storey = self.file.createIfcBuildingStorey(create_ifc_guid(), self._owner_history, Name="Superstructure", ObjectPlacement=self.file.createIfcLocalPlacement(self.building.ObjectPlacement, place_3d))
+        self.sub_storey = self.file.createIfcBuildingStorey(create_ifc_guid(), self._owner_history, Name="Substructure", ObjectPlacement=self.file.createIfcLocalPlacement(self.building.ObjectPlacement, place_3d))
         
         # Relate hierarchy
         self.file.createIfcRelAggregates(create_ifc_guid(), self._owner_history, RelatingObject=self.project, RelatedObjects=[self.site])
         self.file.createIfcRelAggregates(create_ifc_guid(), self._owner_history, RelatingObject=self.site, RelatedObjects=[self.building])
-        self.file.createIfcRelAggregates(create_ifc_guid(), self._owner_history, RelatingObject=self.building, RelatedObjects=[self.storey])
+        self.file.createIfcRelAggregates(create_ifc_guid(), self._owner_history, RelatingObject=self.building, RelatedObjects=[self.storey, self.sub_storey])
 
     def bind_element_to_storey(self, element):
         self.file.createIfcRelContainedInSpatialStructure(create_ifc_guid(), self._owner_history, RelatingStructure=self.storey, RelatedElements=[element])
+
+    def bind_element_to_sub_storey(self, element):
+        self.file.createIfcRelContainedInSpatialStructure(create_ifc_guid(), self._owner_history, RelatingStructure=self.sub_storey, RelatedElements=[element])
 
     def generate_from_extracted_data(self, extracted_dict, cad_context=None):
         """Consume extracted dictionary logic and bind to schema."""
@@ -597,6 +601,39 @@ class BridgeIfcGenerator:
                  self.bind_element_to_storey(elem)
                  self.metadata.map_barrier(elem, cad_context, item.ifc_name)
 
+        def _process_substructure(item):
+            if "Pier Cap" in item.ifc_name:
+                elem_type = self.file.createIfcBeam
+            elif "Pier" in item.ifc_name:
+                elem_type = self.file.createIfcColumn
+            elif "Pile Cap" in item.ifc_name:
+                elem_type = self.file.createIfcFooting
+            elif "Pile" in item.ifc_name:
+                elem_type = self.file.createIfcPile
+            else:
+                elem_type = self.file.createIfcBuildingElementProxy
+
+            if item._class_name == "Plate":
+                prof = self.mapper.create_rectangular_profile(item.T * s, item.L * s)
+                depth = item.W * s
+            else: # CircularSolid
+                prof = self.mapper.create_circle_profile(item.r * s)
+                depth = item.H * s
+
+            scaled_origin = [v * s for v in item.origin]
+            place = self.mapper.create_axis2placement_3d(scaled_origin, z_dir=item.uDir, x_dir=item.wDir)
+            local_identity = self.mapper.create_axis2placement_3d((0,0,0), z_dir=(0,0,1), x_dir=(1,0,0))
+            solid = self.mapper.create_extruded_solid(prof, depth, local_identity)
+            
+            shape = self.file.createIfcShapeRepresentation(self.mapper._context3d, "Body", "SweptSolid", [solid])
+            self.mapper.apply_color(shape, RCC_COLOR)
+            prod_def = self.file.createIfcProductDefinitionShape(None, None, [shape])
+            
+            elem = elem_type(create_ifc_guid(), self._owner_history, Name=item.ifc_name, 
+                             ObjectPlacement=self.file.createIfcLocalPlacement(self.sub_storey.ObjectPlacement, place), 
+                             Representation=prod_def)
+            self.bind_element_to_sub_storey(elem)
+
         # Iterate over extraction dictionary explicitly
         for key in ["girders", "stiffeners"]:
              for item in extracted_dict.get(key, []):
@@ -618,6 +655,10 @@ class BridgeIfcGenerator:
                      _process_barrier(item)
                  elif item._class_name == "RailingSweep":
                      _process_railing(item)
+                     
+        for key in ["substructure"]:
+             for item in extracted_dict.get(key, []):
+                 _process_substructure(item)
                  
         # Intentionally ignore "deck_textures"
         print("Model assembly complete. Saving...")

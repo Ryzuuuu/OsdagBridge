@@ -284,10 +284,12 @@ class CAD3DWindow(QWidget):
         WBEAM_COLOR = Quantity_Color(128/255, 128/255, 128/255, Quantity_TOC_RGB)
         BARRIER_POST_COLOR = Quantity_Color(20/255, 20/255, 20/255, Quantity_TOC_RGB)
         SUPPORT_COLOR = Quantity_Color(20/255.0, 20/255.0, 20/255.0, Quantity_TOC_RGB)
+        CONCRETE_COLOR = Quantity_Color(150/255.0, 150/255.0, 150/255.0, Quantity_TOC_RGB)
+        REBAR_COLOR = Quantity_Color(100/255.0, 100/255.0, 100/255.0, Quantity_TOC_RGB)
 
 
 
-        # HELPER 
+        # HELPER
         def display_and_register(shapes, key, label, color, transparency=None, line_width=None, selectable=True):
             if not shapes:
                 return
@@ -296,21 +298,20 @@ class CAD3DWindow(QWidget):
                 shapes = [shapes]
 
             ais_list = []
-
             for shp in shapes:
-                kwargs = {'color': color, 'update': False}
-                if transparency is not None:
-                    kwargs['transparency'] = float(transparency)
-                ais = display.DisplayShape(shp, **kwargs)
-
+                ais = display.DisplayShape(shp, color=color, update=False)
                 ais = ais[0] if isinstance(ais, list) else ais
+
+                if transparency is not None:
+                    ais.SetTransparency(float(transparency))
+                    context.RecomputePrsOnly(ais, False)
 
                 if line_width is not None:
                     ais.SetWidth(line_width)
                     context.RecomputePrsOnly(ais, False)
 
                 if selectable:
-                    context.Activate(ais, 0)   # REQUIRED for hover
+                    context.Activate(ais, 0)
                 else:
                     context.Deactivate(ais)
                 ais_list.append(ais)
@@ -382,23 +383,23 @@ class CAD3DWindow(QWidget):
 
 
         display_and_register(
-            cad_data.get("supports_vertical",   []), 
-            "Support Vertical",   
-            "Support - Vertical",      
+            cad_data.get("supports_vertical",   []),
+            "Support Vertical",
+            "Support - Vertical",
             SUPPORT_VERTICAL_COLOR,
             line_width=2.0)
-        
+
         display_and_register(
-            cad_data.get("supports_wide_horiz", []), 
-            "Support Transverse", 
-            "Support - Transverse",    
+            cad_data.get("supports_wide_horiz", []),
+            "Support Transverse",
+            "Support - Transverse",
             SUPPORT_TRANSVERSE_COLOR,
             line_width=2.0)
-        
+
         display_and_register(
-            cad_data.get("supports_long_horiz", []), 
+            cad_data.get("supports_long_horiz", []),
             "Support Longitudinal",
-            "Support - Longitudinal", 
+            "Support - Longitudinal",
             SUPPORT_LONGIT_COLOR,
             line_width=2.0)
 
@@ -437,7 +438,7 @@ class CAD3DWindow(QWidget):
             WBEAM_COLOR
         )
 
-        
+
         display_and_register(
             cad_data.get("median_w_beams", []),
             "Median W-Beam",
@@ -465,6 +466,46 @@ class CAD3DWindow(QWidget):
             "Railing",
             f"Railing\nType: {params.railing_type.upper()}\nRails: {params.rail_count}\nWidth: {params.railing_width:.2f} mm",
             BARRIER_COLOR
+        )
+
+        display_and_register(
+            cad_data.get("piers", []),
+            "Pier",
+            "Pier",
+            CONCRETE_COLOR,
+            transparency=0.35
+        )
+
+        display_and_register(
+            cad_data.get("pier_caps", []),
+            "Pier Cap",
+            "Pier Cap",
+            CONCRETE_COLOR,
+            transparency=0.35
+        )
+
+        display_and_register(
+            cad_data.get("pile_caps", []),
+            "Pile Cap",
+            "Pile Cap",
+            CONCRETE_COLOR,
+            transparency=0.35
+        )
+
+        display_and_register(
+            cad_data.get("piles", []),
+            "Pile",
+            "Pile",
+            CONCRETE_COLOR,
+            transparency=0.35
+        )
+
+        display_and_register(
+            cad_data.get("rebar", []),
+            "Rebar",
+            "Rebar",
+            REBAR_COLOR,
+            transparency=None
         )
 
         # Nodes and grillage overlays
@@ -618,7 +659,7 @@ class CAD3DWindow(QWidget):
             _log.warning("capture_for_report: display not ready — skipped")
             return {}
 
-        ALL         = ['Girder', 'Deck', 'Cross Bracing', 'Crash Barrier', 'Median', 'Railing']
+        ALL         = ['Girder', 'Deck', 'Cross Bracing', 'Crash Barrier', 'Median', 'Railing', 'Substructure']
         GIRDER_ONLY = ['Girder']
         GIRDER_DECK = ['Girder', 'Deck']
 
@@ -716,6 +757,7 @@ class CAD3DWindow(QWidget):
             "Crash Barrier": ["Crash Barrier", "Crash Barrier W-Beam"],
             "Median":        ["Median", "Median W-Beam"],
             "Railing":       ["Railing"],
+            "Substructure":  ["Pier", "Pier Cap", "Pile Cap", "Pile", "Rebar"],
             "Grillage":      ["Grillage"],
             "Node":          ["Node"],
         }
@@ -1209,6 +1251,7 @@ class BridgeComponentCheckbox(QWidget):
         ("Crash Barrier", "Crash Barrier"),
         ("Median",        "Median"),
         ("Railing",       "Railing"),
+        ("Substructure",  "Substructure"),
         ("Grillage view", "Grillage"),
         ("Node",          "Node"),
         ("Node Numbers",  "NodeNumbers"),

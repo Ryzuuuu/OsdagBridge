@@ -38,6 +38,9 @@ Common structural elements are defined in `bridge_components/`:
 
 Components are shared across multiple bridge types.
 
+### Comprehensive 3D CAD & IFC Export
+Full parametric 3D CAD generation of both superstructure (girders, decks) and substructure (piers, pile caps, piles, rebar cages) using pythonOCC. Supports interactive 3D visualization and seamless export of components (including RCC substructures) to IFC4 format for BIM integration.
+
 ### Multi-Solver Analysis Support
 Multiple analysis backends are supported:
 - Native lightweight FEM solver  
@@ -65,12 +68,16 @@ OsdagBridge/
 ├── tests/
 └── src/
     └── osdagbridge/
-        ├── core/              # Analysis, design, IO, solvers, codes
-        ├── bridge_types/      # Plate girder, box girder, truss
-        ├── bridge_components/ # Reusable components
-        ├── cli/               # Command-line interface
-        ├── desktop/           # PySide6 GUI
-        └── web/               # Django + React web stack
+        ├── core/                # Analysis, design, IO, solvers, codes
+        │   └── ifc_export_bridge/ # 3D geometry extraction and IFC4 BIM generation
+        ├── bridge_types/        # Bridge system logic (Plate girder, Box girder, etc.)
+        ├── bridge_components/   # Reusable procedural 3D CAD builders
+        │   ├── super_structure/   # Deck, Crash barriers, Bearings
+        │   ├── sub_structure/     # Pier columns, Pier caps, Pedestals, Rebar cages
+        │   └── foundation/        # Piles, Pile caps
+        ├── cli/                 # Command-line interface
+        ├── desktop/             # PySide6 GUI (with integrated PythonOCC 3D CAD viewer)
+        └── web/                 # Django + React web stack
 ```
 
 ---

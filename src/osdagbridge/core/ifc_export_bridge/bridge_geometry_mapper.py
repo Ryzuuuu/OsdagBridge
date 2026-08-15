@@ -66,6 +66,13 @@ class BridgeGeometryMapper:
             XDim=float(width), YDim=float(height)
         )
         
+    def create_circle_profile(self, radius):
+        return self.file.createIfcCircleProfileDef(
+            ProfileType="AREA", ProfileName=None,
+            Position=self.create_axis2placement_2d(),
+            Radius=float(radius)
+        )
+        
     def create_l_shape_profile(self, depth, width, thickness):
         return self.file.createIfcLShapeProfileDef(
             ProfileType="AREA", ProfileName=None,

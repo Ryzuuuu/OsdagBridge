@@ -125,7 +125,8 @@ class PlateGirderIFCExtractor:
             "cross_bracings": self._extract_cross_bracings(n_girders, spacing),
             "deck_slab": self._extract_deck_slab(total_width),
             "crash_barriers": self._extract_safety_components(total_width, actual_base_width, actual_railing_width),
-            "supports": self._extract_supports(n_girders, spacing)
+            "supports": self._extract_supports(n_girders, spacing),
+            "substructure": self._extract_substructure(total_width)
         }
 
     def _solve_girder_layout(self, total_width):
@@ -492,3 +493,44 @@ class PlateGirderIFCExtractor:
                 uDir=[0,1,0], wDir=[0,0,1], ifc_name=f"Cylindrical Support {i+1}"))
                 
         return {"supports_tri": [s for s in supports if s._class_name == "StiffenerPlate"], "supports_cyl": [s for s in supports if s._class_name == "CircularSolid"]}
+
+    def _extract_substructure(self, total_deck_width):
+        components = []
+        girder_bottom_z = -(self.cad.girder_section_d / 2.0) - self.cad.girder_section_tf_b
+        
+        pier_cap_depth = 600.0
+        pier_height = 3000.0
+        pile_cap_depth = 600.0
+        
+        pier_cap_z = girder_bottom_z - pier_cap_depth
+        pier_bottom_z = pier_cap_z - pier_height
+        pile_cap_bottom_z = pier_bottom_z - pile_cap_depth
+        
+        x_positions = [0.0, self.cad.span_length_L]
+        
+        for idx, x_pos in enumerate(x_positions):
+            suffix = "L" if idx == 0 else "R"
+            
+            # Pier Cap (Extruded face, trapezoidal - modelled as Box for IFC)
+            components.append(ExtractedObject("Plate", T=2100.0, L=total_deck_width, W=pier_cap_depth,
+                origin=[x_pos - 2100.0/2, -total_deck_width/2, pier_cap_z], uDir=[0,0,1], wDir=[1,0,0], ifc_name=f"Pier Cap {suffix}"))
+            
+            # Pier (Cylinder)
+            components.append(ExtractedObject("CircularSolid", r=400.0, H=pier_height,
+                origin=[x_pos, 0.0, pier_bottom_z], uDir=[0,0,1], wDir=[1,0,0], ifc_name=f"Pier {suffix}"))
+                
+            # Pile Cap (Box)
+            components.append(ExtractedObject("Plate", T=2200.0, L=1200.0, W=pile_cap_depth,
+                origin=[x_pos - 1100.0, -600.0, pile_cap_bottom_z], uDir=[0,0,1], wDir=[1,0,0], ifc_name=f"Pile Cap {suffix}"))
+                
+            # Piles (Cylinders)
+            pile_x_offsets = [-300.0, 300.0]
+            pile_y_offsets = [-300.0, 300.0]
+            pile_idx = 1
+            for px in pile_x_offsets:
+                for py in pile_y_offsets:
+                    components.append(ExtractedObject("CircularSolid", r=200.0, H=5000.0,
+                        origin=[x_pos + px, py, pile_cap_bottom_z - 5000.0], uDir=[0,0,1], wDir=[1,0,0], ifc_name=f"Pile {suffix}-{pile_idx}"))
+                    pile_idx += 1
+                    
+        return components
